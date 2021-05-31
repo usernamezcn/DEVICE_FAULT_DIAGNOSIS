@@ -114,4 +114,5 @@ if __name__=='__main__':
             # plt2pic(data_col)
             time.sleep(5)
 
+            
         # time.sleep(10)

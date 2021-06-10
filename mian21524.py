@@ -65,15 +65,14 @@ def coxStuart(Hour,unnorm_data,data,threshold,     slide,      point):
         count = 0
         for j in range(slide//2):
             # print((data[(slide//2)+j]-data[j])/(data[j]+minnnnn))
-            if ((data[(slide//2)+j+i]-data[j+i])/(data[j+i]+minnnnn))>=threshold:count+=1
+            if ((data[(slide//2)+j+i]-data[j+i])/(0.5))>=threshold:count+=1
         if count>=point:
             time_hour.append(str(Hour.iloc[i]))
-            print('start time ：',str(Hour.iloc[i]),'   end time :',Hour.iloc[i+slide])
-            manyPicPlot(data[i:i+slide],unnorm_data[i:i+slide])
-            time.sleep(3)
+            # print('start time ：',str(Hour.iloc[i]),'   end time :',Hour.iloc[i+slide])
+            # manyPicPlot(data[i:i+slide],unnorm_data[i:i+slide])
+            # time.sleep(3)
         pass
     pass
-    # print(time_hour)
     return time_hour
 
 def normalization(data):
@@ -89,7 +88,7 @@ def normalization(data):
 if __name__=='__main__':
     filePath = './xlsx/'
     new_col = ['H2', 'CH4', 'C2H2', 'TotalHydrocarbon', 'CO']
-    threshold, slide, point = 0.3,20,8
+    threshold, slide, point = 0.15,20,8
     filelists = os.listdir(filePath)
     print(filelists)
     for filelist in filelists:
@@ -115,7 +114,7 @@ if __name__=='__main__':
 
             print('趋势告警：    ',trend)
             # exit(0)
-            # plt2pic(data_col)
+            plt2pic(data_col)
             time.sleep(3)
 
         # time.sleep(10)

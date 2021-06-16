@@ -1,63 +1,19 @@
-from print_.to_pic import plt2pic,xplt2picList,manyPicPlot
-import pandas as pd
+import sys
+from fault_.fault_describe import X, S
+from fault_.des import SS
+from Oracle_.xTraversing_database import xload_data_from_orcale
+from parameter_Definition import threshold, point_1, slide, point,thresholdSudden, point_1Sudden, slideSudden, pointSudden, jump
+from Oracle_.xInsert_to_oracle import Ins2Orc
+from print_.to_pic import plt2pic
+from print_.to_pic import xplt2pic
 import numpy as np
-from scipy.signal import savgol_filter
-import os
-import time
+import pandas as pd
+import datetime, time
+import schedule
 
 
-minnnn = 0.0000001
-#       数据    斜率阈值 子滑动窗口大小 序列阈值
-#               0.03        20          17       趋势告警
-#               0.25         10          8        突变告警
-def alarm(data,threshold,     slide,      point):
-    slope = []
-    end = False
-    for i in range(1, len(data)):
-        if ((data[i] - data[i - 1])/(data[i-1]+minnnn))>=threshold:
-            slope.append(1)
-        # 下降趋势
-        # elif ((data[i] - data[i - 1])/(data[i-1]+minnnn))<=(threshold*-1):
-        #     slope.append(-1)
-        else:
-            slope.append(0)
-    #连续子序列
-    '''
-    for i in slope:
-        if down > point_1 or up > point_1:
-            end_1 = True
-            break
-        if i > 0:
-            down = 0
-            up += 1
-        elif i < 0:
-            up = 0
-            down += 1
-    '''
-    # 非连续子序列
-    if slide > len(data):#如果数据本身的长度不足一个滑窗，那么暂时将滑窗定义为本身数据的长度。
-        slide = len(data) - 1
-    for i in range(0, len(data) - slide):
-        count_up, count_down = 0, 0
-        for j in range(slide):
-            if slope[i + j] > 0: count_up += 1
-            # if slope[i + j] < 0: count_down += 1
-        # if count_up >= point or count_down >= point:
-        if count_up >=point:
-            end = True
-            print(data[i-1:i+slide])
-            print(i)
-            # xplt2picList(data[i:i+slide])
-            # time.sleep(6)
-            break
-    if end:
-        return 1
-    return 0
-
-
-def coxStuart(Hour,unnorm_data,data,threshold,     slide,      point):
-    time_hour = []
-    end,minnnnn = False,0.000000001
+def coxStuart(Hour,data,threshold,     slide,      point):
+    time_hour_start,time_hour_end = [],[]
     if len(data)<slide:slide = len(data)
     for i in range(len(data)-slide):
         if int(str(Hour[i])[11:13]) >= 12:
@@ -67,54 +23,51 @@ def coxStuart(Hour,unnorm_data,data,threshold,     slide,      point):
             # print((data[(slide//2)+j]-data[j])/(data[j]+minnnnn))
             if ((data[(slide//2)+j+i]-data[j+i])/(0.5))>=threshold:count+=1
         if count>=point:
-            time_hour.append(str(Hour.iloc[i]))
+            time_hour_start.append(Hour.iloc[i])
+            time_hour_end.append(Hour.iloc[i+slide])
             # print('start time ：',str(Hour.iloc[i]),'   end time :',Hour.iloc[i+slide])
             # manyPicPlot(data[i:i+slide],unnorm_data[i:i+slide])
             # time.sleep(3)
         pass
     pass
-    return time_hour
-
-def normalization(data):
-    min_,max_ = min(data),max(data)
-    data_repeat = [1]*len(data)
-    if min_==max_:
+    return time_hour_start,time_hour_end
+for i in xload_data_from_orcale():
+    # end_trend, end_mutation = 0,0
+    #趋势告警阈值
+    # threshold, point_1, slide, point = 0.03, 10, 20, 17
+    #突变告警阈值
+    # thresholdSudden, point_1Sudden, slideSudden, pointSudden = 0.06,5,10,8
+    # 设置程序默认值，                  无趋势告警            正常状态
+    data_list,Hour,status_1,status_1_desc,status  = i['data'].tolist(),i['Hour'],0,'wu',0
+    DEVICECODE = i['DeviceCode']
+    name,LINKEDEQUIPMENT = i['MonitorTypeName'],i['LINKEDEQUIPMENT']
+    Monitoring_type_parameter = i['Monitoring_type_parameter']
+    # print(name,'    ',univariate[name])   # SF6气体水分      MOISTURE
+    jump_ = int(jump[Monitoring_type_parameter])
+    # print('Monitoring_type_parameter',Monitoring_type_parameter) # Monitoring_type_parameter 19
+    # print(jump_)# 50
+    if all(e is None for e in data_list):
+        continue
+    ''' 线性函数归一化：将原始数据等比例缩放到  [0,1]  的范围内，
+    不仅 保留了数据的原始特征，而且提高 模型的运算速度和准确率。
+    '''
+    max_,min_ = max(data_list),min(data_list)
+    if max_ == min_:
+        # 说明数据重复，完全相同
         pass
-    for i in range(len(data)):
-        data_repeat[i] =((data[i]-min_)/(max_-min_))
-    return data_repeat
+    else:
+        for i in range(len(data_list)):
+            data_list[i] = abs((data_list[i]-min_)/max_-min_)
+        # end_trend,end_mutation = trend_nor(data_list),mutation_nor(data_list)
+        trend_start, trend_end = coxStuart(Hour, data_list, threshold, slide, point)
+        if len(trend_start)>0:
+            # 发生了趋势告警，状态值设置为1，填写趋势告警说明。
+            status_1 = 1
+            status_1_desc = 'wu'
+        if status_1:
+            status = 1
 
+    Ins2Orc.insert_(LINKEDEQUIPMENT=LINKEDEQUIPMENT, DEVICECODE=DEVICECODE, time_start=trend_start,time_end=trend_end,status = status,status_1 = status_1,status_1_desc= status_1_desc)
 
-if __name__=='__main__':
-    filePath = './xlsx/'
-    new_col = ['H2', 'CH4', 'C2H2', 'TotalHydrocarbon', 'CO']
-    threshold, slide, point = 0.15,20,8
-    filelists = os.listdir(filePath)
-    print(filelists)
-    for filelist in filelists:
-        print('***************',filelist,'***************')
-        data = pd.read_excel(filePath + filelist)
-        data = data.iloc[1:,]
-        data = data.iloc[:-1,]
-        data = data.iloc[::-1]
-        data.index = range(len(data))
-        Hour = data.iloc[:, 0]
-        data = data.iloc[:, [2, 3, 6, 7, 8]]
-        data.columns = new_col
-        for i in new_col:
-            print('监测类型：油中溶解气体    状态量：', i)
-            data_col = data[i]
-            data_list = data_col.tolist()
-            # xplt2picList(data_list)
-            data_list_normalize = normalization(data_list)
-            #                         窗口长度，多元拟合的阶数
-            # 窗口越大平滑效果越明显，越小越贴近原始曲线；阶数越小，平滑效果越明显，越大越接近原始曲线
-            dataSmooth = savgol_filter(data_list,29,3)
-            trend = coxStuart(Hour,data_list,data_list_normalize ,threshold, slide, point)
+    # time.sleep(6)
 
-            print('趋势告警：    ',trend)
-            # exit(0)
-            plt2pic(data_col)
-            time.sleep(3)
-
-        # time.sleep(10)

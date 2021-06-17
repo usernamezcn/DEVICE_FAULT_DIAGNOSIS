@@ -39,9 +39,9 @@ def xload_data_from_orcale(day_step=30, startData='2020-03-11'):
         if multipleNewUnivariate[i['TYPENAME']] == 'none':
             continue
         try:
-            TYPENAME = i['TYPENAME']
+            TYPENAME = i['TYPENAME'] # 覆冰等监测类型
             multiples = multipleNewUnivariate[TYPENAME]
-            for multiple in multiples:
+            for multiple in multiples: # 代表不同监测类型中需要只要考虑的状态量
                 # print(multiple)
                 try:
                     Monitoring_type_parameter = multipleUnivariateDist[multiple] - 1
@@ -52,7 +52,7 @@ def xload_data_from_orcale(day_step=30, startData='2020-03-11'):
                     date_2 = date_one - aDay
                     date_2 = date_2.strftime("%Y-%m-%d")
                     # sql_select_two = "select {} from {} t where t.RESAVE_TIME between date '{}' and date '{}' order by t.RESAVE_TIME and where t.DEVICECODE = '{}'"
-                    sql_select_two = "select {} from {} t where t.DEVICECODE = '{}' and t.RESAVE_TIME between date '{}' and date '{}' order by t.RESAVE_TIME asc"
+                    sql_select_two = "select {},RESAVE_TIME,LINKEDDEVICE from {} t where t.DEVICECODE = '{}' and t.RESAVE_TIME between date '{}' and date '{}' order by t.RESAVE_TIME asc"
                     sql_select_two = sql_select_two.format(multiple, i['MONITORINGDATATABLE'], i['DEVICECODE'],
                                                            date_2, date_1)
                     data_oracle_two = pd.DataFrame(test_oracle.select(sql_select_two))
@@ -68,8 +68,8 @@ def xload_data_from_orcale(day_step=30, startData='2020-03-11'):
                         if len(data_oracle_two) > max_length:
                             data_oracle_two = data_oracle_two[len(data_oracle_two) - max_length:]
                             pass
-                        yield {"DeviceCode": i['DEVICECODE'], "MonitorTypeName": i['TYPENAME'], "Date": date_1,
-                               "data": data_oracle_two, "Monitoring_type_parameter": Monitoring_type_parameter,'LINKEDEQUIPMENT':i['LINKEDEQUIPMENT']}
+                        yield {"DeviceCode": i['DEVICECODE'], "MonitorTypeName": i['TYPENAME'], "Date": date_1,'Hour':data_oracle_two['RESAVE_TIME'],
+                               "data": data_oracle_two[multiple], "Monitoring_type_parameter": Monitoring_type_parameter,'LINKEDEQUIPMENT':i['LINKEDEQUIPMENT']}
                 except:
                     # print('in')
                     # print('*************************',multiple,'*************************')
